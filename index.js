@@ -4,19 +4,19 @@ const PORT = process.env.PORT || 3000;
 
 const watchLater = [
     {
-        id: 382,
+        id: 100,
         number: 1,
         title: "Title 1",
         duration: "18:25",
     },
     {
-        id: 586,
+        id: 101,
         number: 2,
         title: "Title 2",
         duration: "18:25",
     },
     {
-        id: 382,
+        id: 102,
         number: 3,
         title: "Title 3",
         duration: "18:25",
@@ -63,6 +63,39 @@ function getHandler(req, res) {
         : res.end("404 Error. Data not found");
 }
 
+function postHandler(req, res) {
+    let body = "";
+
+    req.on("data", (chunk) => {
+        body += chunk.toString();
+    });
+
+    req.on("end", () => {
+        const newUser = JSON.parse(body);
+
+        const duplicateFound = watchLater.some(
+            (video) => video.id === newUser.id,
+        );
+
+        if (duplicateFound) {
+            console.log("duplicate found");
+        } else {
+            const lastObj = watchLater.forEach((obj, index) => {
+                const lastIndex = watchLater.length - 1;
+                if (index === lastIndex) return index;
+            });
+
+            newUser.number = watchLater.indexOf();
+            // console.log(newUser);
+            // watchLater.push(newUser);
+        }
+
+        res.end();
+        return;
+        res.status = 201;
+    });
+}
+
 function respondIfBadRequest(req, res, error) {
     if (res.statusCode === 401) {
         console.error(error);
@@ -80,6 +113,8 @@ const server = http.createServer((req, res) => {
         jsonMiddleWare(req, res, () => {
             if (req.method === "GET") {
                 getHandler(req, res);
+            } else if (req.method === "POST") {
+                postHandler(req, res);
             } else {
                 try {
                     res.statusCode = 401;
