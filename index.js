@@ -4,19 +4,19 @@ const PORT = process.env.PORT || 3000;
 
 const watchLater = [
     {
-        id: 100,
+        id: 675,
         number: 1,
         title: "Title 1",
         duration: "18:25",
     },
     {
-        id: 101,
+        id: 106,
         number: 2,
         title: "Title 2",
         duration: "18:25",
     },
     {
-        id: 102,
+        id: 567,
         number: 3,
         title: "Title 3",
         duration: "18:25",
@@ -25,6 +25,8 @@ const watchLater = [
 
 function logger(req, res, next) {
     console.log(req.method, req.url);
+    console.log("\n");
+    console.log(watchLater);
     next();
 }
 
@@ -71,57 +73,50 @@ function postHandler(req, res) {
     });
 
     req.on("end", () => {
-        const newUser = JSON.parse(body);
+        const newVideo = JSON.parse(body);
 
         const duplicateFound = watchLater.some(
-            (video) => video.id === newUser.id,
+            (video) => video.id === newVideo.id,
         );
 
-        if (duplicateFound) {
-            console.log("duplicate found");
-        } else {
-            const lastObj = watchLater.forEach((obj, index) => {
-                const lastIndex = watchLater.length - 1;
-                if (index === lastIndex) return index;
-            });
+        try {
+            if (duplicateFound) {
+                throw new Error("Video already exists");
+            } else {
+                let lastVideoNumber = watchLater.at(-1).number;
+                newVideo.number = ++lastVideoNumber;
 
-            newUser.number = watchLater.indexOf();
-            // console.log(newUser);
-            // watchLater.push(newUser);
+                watchLater.push(newVideo);
+
+                res.statusCode = 201;
+                res.end(JSON.stringify(watchLater));
+            }
+        } catch (error) {
+            res.statusCode = 400;
+            res.setHeader("Content-Type", "text/plain");
+            res.end("Video exists");
         }
-
-        res.end();
-        return;
-        res.status = 201;
     });
-}
-
-function respondIfBadRequest(req, res, error) {
-    if (res.statusCode === 401) {
-        console.error(error);
-
-        res.writeHead(res.statusCode, {
-            "Content-Type": "text/plain",
-        });
-
-        res.end("Wrong request");
-    }
 }
 
 const server = http.createServer((req, res) => {
     logger(req, res, () => {
         jsonMiddleWare(req, res, () => {
-            if (req.method === "GET") {
-                getHandler(req, res);
-            } else if (req.method === "POST") {
-                postHandler(req, res);
-            } else {
-                try {
-                    res.statusCode = 401;
-                    throw new Error("Wrong request");
-                } catch (error) {
-                    respondIfBadRequest(req, res, error);
+            try {
+                if (req.method === "GET") {
+                    getHandler(req, res);
+                } else if (req.method === "POST") {
+                    postHandler(req, res);
+                } else {
+                    res.statusCode = 400;
+                    throw new Error("Wrong HTTP request");
                 }
+            } catch (error) {
+                res.writeHead(res.statusCode, {
+                    "Content-Type": "text/plain",
+                });
+
+                res.end("Wrong request");
             }
         });
     });
