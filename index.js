@@ -2,26 +2,26 @@ import http from "http";
 
 const PORT = process.env.PORT || 3000;
 
-const watchLater = [
+const playLists = [
     {
         id: 675,
         number: 1,
         title: "Title 1",
-        duration: "18:25",
     },
     {
         id: 106,
         number: 2,
         title: "Title 2",
-        duration: "18:25",
     },
     {
         id: 567,
         number: 3,
         title: "Title 3",
-        duration: "18:25",
     },
 ];
+
+const returnMatches = (reqUrl) =>
+    reqUrl.match(/^\/api\/playlists\/([1-9]\d{2})$/); //e.g -> ['/api/videos/679', '679', index: 0,input: '/api/videos/679', groups: undefined]
 
 function logger(req, res, next) {
     console.log(req.method, req.url);
@@ -33,50 +33,24 @@ function jsonMiddleWare(req, res, next) {
     next();
 }
 
-function getHandler(req, res) {
-    const regexMatches = req.url.match(/^\/api\/videos\/([1-9]\d{2})$/); //e.g ['/api/videos/679', '679', index: 0,input: '/api/videos/679', groups: undefined]
-    let infoReturned = false;
-    let singleVideoRequest = regexMatches ? true : false;
+function returnAllPlaylists(req, res) {
+    res.statusCode = 200;
+    res.end(JSON.stringify(playLists));
+}
+
+function returnSinglePlaylist(req, res) {
+    const requestId = Number(returnMatches(req.url)[1]);
+    const playlist = playLists.find((obj) => obj.id === requestId);
 
     try {
-        if (singleVideoRequest) {
-            returnSingleVideo();
-        } else {
-            returnAllVideos();
-        }
-
-        if (!infoReturned) throw new Error("Bad GET request");
+        if (!playlist) throw new Error("Video not found");
+        res.statusCode = 200;
+        res.end(JSON.stringify(playlist));
     } catch (error) {
         console.error(error);
 
-        res.statusCode = 404;
-        res.writeHead(res.statusCode, {
-            "Content-Type": "text/plain",
-        });
-
-        regexMatches
-            ? res.end("404 Error. Video not found")
-            : res.end("404 Error. Wrong request");
-    }
-
-    function returnAllVideos() {
-        res.statusCode = 200;
-        infoReturned = true;
-
-        res.end(JSON.stringify(watchLater));
-    }
-
-    function returnSingleVideo() {
-        const id = Number(regexMatches[1]);
-        const video = watchLater.find((obj) => obj.id === id);
-
-        if (video) {
-            res.statusCode = 200;
-            infoReturned = true;
-
-            res.end(JSON.stringify(video));
-            return;
-        }
+        res.writeHead(404, { "Content-Type": "text/plain" });
+        res.end("404. Video not found");
     }
 }
 
@@ -88,35 +62,32 @@ function postHandler(req, res) {
     });
 
     req.on("end", () => {
-        const newVideo = JSON.parse(body);
+        const newPlaylist = JSON.parse(body);
 
-        const duplicateFound = watchLater.some(
-            (video) => video.id === newVideo.id,
+        const duplicateFound = playLists.some(
+            (obj) => obj.id === newPlaylist.id,
         );
 
         try {
             if (duplicateFound) {
-                throw new Error("Video already exists");
+                throw new Error("Playlist already exists");
             } else {
-                console.log("hello");
                 //update the number property on the new video object
-                const updatedVideoObj = updateNumberProperty();
+                const updatedPlaylistObj = updateNumberProperty();
 
-                watchLater.push(updatedVideoObj);
+                playLists.push(updatedPlaylistObj);
 
-                // res.statusCode = 201;
-                // res.end(JSON.stringify(watchLater));
+                res.statusCode = 201;
+                res.end(JSON.stringify(playLists));
 
                 function updateNumberProperty() {
-                    let lastVideo = structuredClone(watchLater.at(-1));
+                    let lastObjNumberProperty = playLists.at(-1).number;
 
-                    let arr2D = Object.entries(lastVideo);
+                    let arr2D = Object.entries(newPlaylist);
 
-                    arr2D.splice(1, 1, ["number", lastVideo.number + 1]);
+                    arr2D.splice(1, 0, ["number", lastObjNumberProperty + 1]);
 
-                    let newArr = arr2D;
-
-                    return Object.fromEntries(newArr);
+                    return Object.fromEntries(arr2D);
                 }
             }
         } catch (error) {
@@ -133,9 +104,14 @@ const server = http.createServer((req, res) => {
     logger(req, res, () => {
         jsonMiddleWare(req, res, () => {
             try {
-                if (req.method === "GET" && req.url === "/api/videos") {
-                    getHandler(req, res);
-                } else if (req.method === "POST" && req.url === "/api/videos") {
+                if (req.method === "GET" && req.url === "/api/playlists") {
+                    returnAllPlaylists(req, res);
+                } else if (req.method === "GET" && returnMatches(req.url)) {
+                    returnSinglePlaylist(req, res);
+                } else if (
+                    req.method === "POST" &&
+                    req.url === "/api/playlists"
+                ) {
                     postHandler(req, res);
                 } else {
                     res.statusCode = 500;

@@ -5,7 +5,7 @@
     "main": "index.js",
     "scripts": {
         "dev": "node --env-file=.env --watch --inspect index.js\n",
-        "debug": "node --env-file=.env --watch --inspect-brk\n index.js"
+        "debug": "node --env-file=.env --watch --inspect-brk index.js\n"
     },
     "keywords": [],
     "author": "",
