@@ -1,58 +1,136 @@
-import fs from "fs/promises";
 import http from "http";
-import path from "path";
-import url from "url";
 
 const PORT = process.env.PORT || 3000;
 
-const __filename = url.fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const playLists = [
+    {
+        id: 675,
+        number: 1,
+        title: "Title 1",
+    },
+    {
+        id: 106,
+        number: 2,
+        title: "Title 2",
+    },
+    {
+        id: 567,
+        number: 3,
+        title: "Title 3",
+    },
+];
 
-const server = http.createServer(async (req, res) => {
+const returnMatches = (reqUrl) =>
+    reqUrl.match(/^\/api\/playlists\/([1-9]\d{2})$/); //e.g -> ['/api/videos/679', '679', index: 0,input: '/api/videos/679', groups: undefined]
+
+function logger(req, res, next) {
+    console.log(req.method, req.url);
+    next();
+}
+
+function jsonMiddleWare(req, res, next) {
+    res.setHeader("Content-Type", "application/json");
+    next();
+}
+
+function returnAllPlaylists(req, res) {
+    res.statusCode = 200;
+    res.end(JSON.stringify(playLists));
+}
+
+function returnSinglePlaylist(req, res) {
+    const requestId = Number(returnMatches(req.url)[1]);
+    const playlist = playLists.find((obj) => obj.id === requestId);
+
     try {
-        if (req.method !== "GET") throw new Error("Method not allowed");
+        if (!playlist) throw new Error("Video not found");
+        res.statusCode = 200;
+        res.end(JSON.stringify(playlist));
+    } catch (error) {
+        console.error(error);
 
-        let notFound = false;
-        let fileName;
+        res.writeHead(404, { "Content-Type": "text/plain" });
+        res.end("404. Video not found");
+    }
+}
 
-        switch (req.url) {
-            case "/":
-                fileName = "index.html";
-                break;
-            case "/about":
-                fileName = "about.html";
-                break;
-            case "/contact":
-                fileName = "contact-us.html";
-                break;
-            default: //like the else block
-                notFound = true;
-                fileName = "404-page.html";
-                break;
-        }
+function postHandler(req, res) {
+    let body = "";
 
-        res.writeHead(notFound ? 404 : 200, { "Content-Type": "text/html" });
+    req.on("data", (chunk) => {
+        body += chunk.toString();
+    });
 
-        const data = await fs.readFile(
-            path.join(__dirname, "public", fileName),
+    req.on("end", () => {
+        const newPlaylist = JSON.parse(body);
+
+        const duplicateFound = playLists.some(
+            (obj) => obj.id === newPlaylist.id,
         );
 
-        res.write(data);
-        res.end();
-    } catch (error) {
-        console.log(error);
+        try {
+            if (duplicateFound) {
+                throw new Error("Playlist already exists");
+            } else {
+                //update the number property on the new video object
+                const updatedPlaylistObj = updateNumberProperty();
 
-        res.writeHead(500, { "Content-Type": "text/plain" });
-        res.end("Server error");
-    }
-});
+                playLists.push(updatedPlaylistObj);
 
-fs.readFile("example.txt", "utf-8", (err, data) => {
-    if (err) console.log(err);
+                res.statusCode = 201;
+                res.end(JSON.stringify(playLists));
 
-    console.log(data);
+                function updateNumberProperty() {
+                    let lastObjNumberProperty = playLists.at(-1).number;
+
+                    let arr2D = Object.entries(newPlaylist);
+
+                    arr2D.splice(1, 0, ["number", lastObjNumberProperty + 1]);
+
+                    return Object.fromEntries(arr2D);
+                }
+            }
+        } catch (error) {
+            console.log(error);
+
+            res.statusCode = 400;
+            res.setHeader("Content-Type", "text/plain");
+            res.end("Video exists");
+        }
+    });
+}
+
+const server = http.createServer((req, res) => {
+    logger(req, res, () => {
+        jsonMiddleWare(req, res, () => {
+            try {
+                if (req.method === "GET" && req.url === "/api/playlists") {
+                    returnAllPlaylists(req, res);
+                } else if (req.method === "GET" && returnMatches(req.url)) {
+                    returnSinglePlaylist(req, res);
+                } else if (
+                    req.method === "POST" &&
+                    req.url === "/api/playlists"
+                ) {
+                    postHandler(req, res);
+                } else {
+                    res.statusCode = 500;
+                    throw new Error("Wrong HTTP request");
+                }
+            } catch (error) {
+                console.error(error);
+
+                res.writeHead(res.statusCode, {
+                    "Content-Type": "text/plain",
+                });
+
+                res.end("Can't handle request");
+            }
+        });
+    });
 });
 
 server.listen(PORT, () => {
-    console.log("Listening on port " + PORT);
+    console.log(`Listening on port ${PORT} \n`);
+    console.log("----------------------------");
 });
