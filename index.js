@@ -41,13 +41,13 @@ function checkIfPlaylistIsStored(req, res) {
         if (playlist) {
             return playlist;
         } else {
-            throw new Error("Video not found");
+            throw new Error("Playlist not found");
         }
     } catch (error) {
         console.error(error);
 
         res.writeHead(404, { "Content-Type": "text/plain" });
-        res.end("404. Video not found");
+        res.end("404. Playlist not found");
     }
 }
 
@@ -222,6 +222,29 @@ function validatePatchPayload(requestPayload) {
     }
 }
 
+//!DELETE HANDLER
+function deleteSinglePlaylist(req, res) {
+    const playlistToDelete = checkIfPlaylistIsStored(req, res);
+
+    if (!playlistToDelete) return;
+
+    const playlistIndex = playlists.indexOf(playlistToDelete);
+
+    playlists.splice(playlistIndex, 1);
+
+    res.status = 200;
+    res.end(JSON.stringify({ deletedPlaylist: playlistToDelete }));
+}
+
+function deleteAllPlaylists(req, res) {
+    playlists.length = 0;
+
+    res.statusCode = 200;
+    res.end(JSON.stringify(playlists));
+
+    return playlists;
+}
+
 const server = http.createServer((req, res) => {
     logger(req, res, () => {
         jsonMiddleWare(req, res, () => {
@@ -234,6 +257,10 @@ const server = http.createServer((req, res) => {
                     createNewPlaylist(req, res);
                 } else if (req.method === "PATCH" && returnMatches(req.url)) {
                     modifyPlaylistName(req, res);
+                } else if (req.method === "DELETE" && returnMatches(req.url)) {
+                    deleteSinglePlaylist(req, res);
+                } else if (req.method === "DELETE" && req.url === "/api/playlists") {
+                    console.log(deleteAllPlaylists(req, res));
                 } else {
                     res.statusCode = 500;
                     throw new Error("Wrong HTTP request");
